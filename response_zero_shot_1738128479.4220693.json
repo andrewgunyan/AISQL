@@ -1,0 +1,62 @@
+{
+  "strategy": "zero_shot",
+  "prompt_prefix": "CREATE TABLE Apartment (\n    apartmentId INT UNSIGNED PRIMARY KEY,\n    rooms INT,\n    baths INT,\n    contractId INT,\n    address TEXT  ,\n    FOREIGN KEY (contractId) REFERENCES Contract (contractId)\n);\n\nCREATE TABLE Contract (\n    contractId INT UNSIGNED PRIMARY KEY,\n    tenantId INT,\n    guarenterId INT,\n    monthlyCost INT,\n    apartmentId INT,\n    startDate DATE  ,\n    endDate DATE  ,\n    FOREIGN KEY (tenantId) REFERENCES Tenant (tenantId),\n    FOREIGN KEY (guarenterId) REFERENCES Guarentor (guarentorId),\n    FOREIGN KEY (apartmentId) REFERENCES Apartment (apartmentId)\n);\n\nCREATE TABLE Person (\n    personId INT UNSIGNED PRIMARY KEY,\n    firstName TEXT  ,\n    lastName TEXT  ,\n    phoneNumber TEXT  \n);\n\nCREATE TABLE Guarentor (\n    guarentorId INT UNSIGNED PRIMARY KEY,\n    identification TEXT  ,\n    creditScore INT,\n    personId INT,\n    FOREIGN KEY (personId) REFERENCES Person (personId)\n);\n\nCREATE TABLE Tenant (\n    tenantId INT UNSIGNED PRIMARY KEY,\n    birthDate DATE  ,\n    income INT,\n    personId INT,\n    FOREIGN KEY (personId) REFERENCES Person (personId)\n);\n\nCREATE TABLE Management (\n    managementId INT UNSIGNED PRIMARY KEY,\n    managementName TEXT,\n    apartmentId INT,\n    FOREIGN KEY (apartmentId) REFERENCES Apartment (apartmentId)\n);\n\nCREATE TABLE Payment (\n    paymentId INT UNSIGNED PRIMARY KEY,\n    contractId INT,\n    amountPayed INT,\n    datePayed DATE,\n    FOREIGN KEY (contractId) REFERENCES Contract (contractId)\n);\n\nCREATE TABLE Maintenance (\n    maINTenanceId INT UNSIGNED PRIMARY KEY,\n    requestDate DATE,\n    apartmentId INT,\n    problemDescription TEXT,\n    status BOOLEAN,\n    employeeId INT,\n    tenantRequestingId INT,\n    FOREIGN KEY (apartmentId) REFERENCES Apartment (apartmentId),\n    FOREIGN KEY (employeeId) REFERENCES Employee (employeeId),\n    FOREIGN KEY (tenantRequestingId) REFERENCES Tenant (tenantId)\n);\n\nCREATE TABLE Employee (\n    employeeId INT UNSIGNED PRIMARY KEY,\n    salary INT,\n    personId INT,\n    employerId INT,\n    FOREIGN KEY (personId) REFERENCES Person (personId),\n    FOREIGN KEY (employerId) REFERENCES Management (managementId)\n);\n Give me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not expalin it!",
+  "questionResults": [
+    {
+      "question": "Which tenant is paying the most rent?",
+      "sql": "\nSELECT Tenant.tenantId, Person.firstName, Person.lastName, Contract.monthlyCost\nFROM Tenant\nJOIN Person ON Tenant.personId = Person.personId\nJOIN Contract ON Tenant.tenantId = Contract.tenantId\nORDER BY Contract.monthlyCost DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[(3, 'James', 'Fred', 1200)]",
+      "friendlyResponse": "The tenant paying the most rent is James, with a rent of $1,200.",
+      "error": "None"
+    },
+    {
+      "question": "Who has a contract in the second apartment?",
+      "sql": "\nSELECT Tenant.firstName, Tenant.lastName \nFROM Contract \nJOIN Tenant ON Contract.tenantId = Tenant.tenantId \nWHERE Contract.apartmentId = 2;\n",
+      "queryRawResponse": "[(3, 'James', 'Fred', 1200)]",
+      "friendlyResponse": "The tenant paying the most rent is James, with a rent of $1,200.",
+      "error": "no such column: Tenant.firstName"
+    },
+    {
+      "question": "What tenant has requested the most maintenance?",
+      "sql": "\nSELECT tenantRequestingId, COUNT(*) AS maintenanceRequestCount\nFROM Maintenance\nGROUP BY tenantRequestingId\nORDER BY maintenanceRequestCount DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[(5, 1)]",
+      "friendlyResponse": "The tenant who requested the most maintenance is tenant number 5.",
+      "error": "None"
+    },
+    {
+      "question": "Which managment company requires the most maintenance on their properties?",
+      "sql": "\nSELECT m.managementName, COUNT(ma.maINTenanceId) AS maintenance_count\nFROM Management m\nJOIN Apartment a ON m.apartmentId = a.apartmentId\nJOIN Maintenance ma ON a.apartmentId = ma.apartmentId\nGROUP BY m.managementName\nORDER BY maintenance_count DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[('Springfield Property Management', 2)]",
+      "friendlyResponse": "The management company that requires the most maintenance on their properties is Springfield Property Management.",
+      "error": "None"
+    },
+    {
+      "question": "How many tenants have guarentors for their contract?",
+      "sql": "\nSELECT COUNT(DISTINCT t.tenantId) AS tenantWithGuarentors\nFROM Tenant t\nJOIN Contract c ON t.tenantId = c.tenantId\nWHERE c.guarenterId IS NOT NULL;\n",
+      "queryRawResponse": "[(2,)]",
+      "friendlyResponse": "There are 2 tenants with guarantors for their contracts.",
+      "error": "None"
+    },
+    {
+      "question": "Which employee does the most maintenance?",
+      "sql": "\nSELECT employeeId, COUNT(*) AS maintenanceCount\nFROM Maintenance\nGROUP BY employeeId\nORDER BY maintenanceCount DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[(1, 3)]",
+      "friendlyResponse": "The employee who does the most maintenance is employee 1.",
+      "error": "None"
+    },
+    {
+      "question": "Which management company has the most employees?",
+      "sql": "\nSELECT management.managementName, COUNT(employee.employeeId) AS employeeCount\nFROM Management management\nJOIN Employee employee ON management.apartmentId = employee.employerId\nGROUP BY management.managementId\nORDER BY employeeCount DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[('Springfield Property Management', 1)]",
+      "friendlyResponse": "The management company with the most employees is Springfield Property Management, with 1 employee.",
+      "error": "None"
+    },
+    {
+      "question": "Are there any employees that live in the same apartment complex they work at?",
+      "sql": "\nSELECT DISTINCT e.*\nFROM Employee e\nJOIN Apartment a ON e.employerId = (SELECT m.managementId FROM Management m WHERE m.apartmentId = a.apartmentId)\nJOIN Tenant t ON a.apartmentId = t.apartmentId\nWHERE e.personId IN (SELECT t.personId FROM Tenant t WHERE t.tenantId = e.employerId);\n",
+      "queryRawResponse": "[('Springfield Property Management', 1)]",
+      "friendlyResponse": "The management company with the most employees is Springfield Property Management, with 1 employee.",
+      "error": "no such column: t.apartmentId"
+    }
+  ]
+}
